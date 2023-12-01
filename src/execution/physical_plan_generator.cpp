@@ -10,6 +10,9 @@
 #include "duckdb/planner/operator/logical_extension_operator.hpp"
 #include "duckdb/planner/operator/list.hpp"
 
+#include <iostream>
+using namespace std;
+
 namespace duckdb {
 
 class DependencyExtractor : public LogicalOperatorVisitor {
@@ -116,6 +119,7 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::CreatePlan(LogicalOperator &
 	case LogicalOperatorType::LOGICAL_ASOF_JOIN:
 	case LogicalOperatorType::LOGICAL_DELIM_JOIN:
 	case LogicalOperatorType::LOGICAL_COMPARISON_JOIN:
+		cout << "\n" << "physical_plan_generator LogicalOperatorType::LOGICAL_COMPARISON_JOIN";
 		plan = CreatePlan(op.Cast<LogicalComparisonJoin>());
 		break;
 	case LogicalOperatorType::LOGICAL_CROSS_PRODUCT:

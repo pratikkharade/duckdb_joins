@@ -344,3 +344,4 @@ extension/extension_config_local.cmake
 
 # extension_external dir
 extension_external
+src/execution/physical_plan_generator.cpp

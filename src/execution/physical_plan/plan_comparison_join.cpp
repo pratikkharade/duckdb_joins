@@ -17,6 +17,16 @@
 #include "duckdb/planner/expression_iterator.hpp"
 #include "duckdb/catalog/catalog_entry/duck_table_entry.hpp"
 
+#include "duckdb/execution/operator/learned_join/duckdb_sstable.hpp"
+#include "duckdb/execution/operator/learned_join/duckdb_sstable_builder.hpp"
+#include "duckdb/execution/operator/learned_join/duckdb_sstable_iterator.hpp"
+#include "duckdb/execution/operator/learned_join/algos/hash_join.hpp"
+#include "duckdb/execution/operator/learned_join/algos/sort_join.hpp"
+
+#include <iostream>
+using namespace std;
+using namespace learned_index;
+
 namespace duckdb {
 
 static bool CanPlanIndexJoin(ClientContext &context, TableScanBindData &bind_data, PhysicalTableScan &scan) {
@@ -306,6 +316,32 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::PlanComparisonJoin(LogicalCo
 		// Equality join with small number of keys : possible perfect join optimization
 		PerfectHashJoinStats perfect_join_stats;
 		CheckForPerfectJoinOpt(op, perfect_join_stats);
+
+		/*
+			Adding print comments to debug.
+		*/
+		cout << "\n" << "plan_comparison_join Calling PhysicalHashJoin!!!";
+		// bool flag1 = DuckDbSSTable::dummyDuckDbSSTable();
+		// bool flag11 = DuckDbSSTable::dummySSTable();
+		// cout << "\n1 " << flag1 << ":" << flag11 <<" flag";
+		// bool flag2 = DuckDbSSTableBuilder::dummyDuckDbSSTableBuilder();
+		// bool flag21 = DuckDbSSTableBuilder::dummySSTableBuilder();
+		// cout << "\n2 " << flag2 << " flag";
+		// cout << "\n2 " << flag1 << ":" << flag21 <<" flag";
+		// bool flag3 = DuckDbSSTableIterator::dummyDuckDbSSTableIterator();
+		// bool flag31 = DuckDbSSTableIterator::dummySSTableIterator();
+		// cout << "\n3 " << flag3 << " flag";
+		// cout << "\n3 " << flag1 << ":" << flag31 <<" flag";
+		// bool flag4 = HashJoin::dummyDuckDbHashJoin();
+		// cout << "\n4 " << flag4 << " flag";
+
+		DuckDbSSTable::buildDuckDbSSTable();
+
+		cout << "\n" << "All 3 methods called";
+		/*
+			Comments end.
+		*/
+
 		plan = make_uniq<PhysicalHashJoin>(op, std::move(left), std::move(right), std::move(op.conditions),
 		                                   op.join_type, op.left_projection_map, op.right_projection_map,
 		                                   std::move(op.mark_types), op.estimated_cardinality, perfect_join_stats);
