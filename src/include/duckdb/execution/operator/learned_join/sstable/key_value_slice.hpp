@@ -8,6 +8,9 @@
 
 #pragma once
 
+#include "duckdb/execution/operator/learned_join/interfaces/key_to_point.h"
+#include "duckdb/execution/operator/learned_join/interfaces/comparator.hpp"
+
 namespace learned_index {
 
     class KVSlice {
@@ -35,7 +38,31 @@ namespace learned_index {
         int key_size_bytes_;
         int value_size_bytes_;
         const char *data_;
-};
+    };
+    
+    class DuckDbKeyToFloatConverter: public KeyToPointConverter<uint64_t> {
+    public:
+        POINT_FLOAT_TYPE toPoint(const uint64_t &a) override {
+            /* POINT_FLOAT_TYPE Defined in config.h */
+            return (POINT_FLOAT_TYPE)a;
+        }
+    };
+
+    class KVUint64Cmp : public Comparator<uint64_t> {
+    public:
+        int compare(const uint64_t &a, const uint64_t &b) {
+            cout << "\nInside compare: a: " << a << ", b: " << b << " ";
+            if (a < b) {
+                cout << "\nReturn -1";
+                return -1;
+            }
+            if (a > b) {
+                cout << "\nReturn 1";
+                return 1;
+            }
+            return 0;
+            }
+    };
 }
 
 

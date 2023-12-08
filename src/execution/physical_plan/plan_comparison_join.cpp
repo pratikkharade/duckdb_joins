@@ -17,11 +17,11 @@
 #include "duckdb/planner/expression_iterator.hpp"
 #include "duckdb/catalog/catalog_entry/duck_table_entry.hpp"
 
-#include "duckdb/execution/operator/learned_join/duckdb_sstable.hpp"
-#include "duckdb/execution/operator/learned_join/duckdb_sstable_builder.hpp"
-#include "duckdb/execution/operator/learned_join/duckdb_sstable_iterator.hpp"
 #include "duckdb/execution/operator/learned_join/algos/hash_join.hpp"
-#include "duckdb/execution/operator/learned_join/algos/sort_join.hpp"
+#include "duckdb/execution/operator/learned_join/interfaces/iterator.hpp"
+#include "duckdb/execution/operator/learned_join/indexes/pgm_index.h"
+#include "duckdb/execution/operator/learned_join/interfaces/index.hpp"
+#include "duckdb/execution/operator/learned_join/algos/table_op.hpp"
 
 #include <iostream>
 using namespace std;
@@ -318,28 +318,93 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::PlanComparisonJoin(LogicalCo
 		CheckForPerfectJoinOpt(op, perfect_join_stats);
 
 		/*
-			Adding print comments to debug.
+			Modified Code
 		*/
-		cout << "\n" << "plan_comparison_join Calling PhysicalHashJoin!!!";
-		// bool flag1 = DuckDbSSTable::dummyDuckDbSSTable();
-		// bool flag11 = DuckDbSSTable::dummySSTable();
-		// cout << "\n1 " << flag1 << ":" << flag11 <<" flag";
-		// bool flag2 = DuckDbSSTableBuilder::dummyDuckDbSSTableBuilder();
-		// bool flag21 = DuckDbSSTableBuilder::dummySSTableBuilder();
-		// cout << "\n2 " << flag2 << " flag";
-		// cout << "\n2 " << flag1 << ":" << flag21 <<" flag";
-		// bool flag3 = DuckDbSSTableIterator::dummyDuckDbSSTableIterator();
-		// bool flag31 = DuckDbSSTableIterator::dummySSTableIterator();
-		// cout << "\n3 " << flag3 << " flag";
-		// cout << "\n3 " << flag1 << ":" << flag31 <<" flag";
-		// bool flag4 = HashJoin::dummyDuckDbHashJoin();
-		// cout << "\n4 " << flag4 << " flag";
+		// CREATE 2 int vectors.
+		vector<uint64_t> leftVector = {};
+		leftVector.push_back(10);
+		leftVector.push_back(20);
+		leftVector.push_back(30);
+		vector<uint64_t> rightVector = {};
+		rightVector.push_back(10);
+		rightVector.push_back(15);
+		rightVector.push_back(20);
+		rightVector.push_back(25);
+		rightVector.push_back(30);
 
-		DuckDbSSTable::buildDuckDbSSTable();
+		// CREATE SSTables using the above vectors.
+		cout << "\n" << "Creating leftSSTable: ";
+		SSTable<uint64_t> leftSSTable;
+		leftSSTable.buildSSTable(leftVector);
+		cout << "\n" << "Creating rightSSTable: ";
+		SSTable<uint64_t> rightSSTable;
+		rightSSTable.buildSSTable(rightVector);
 
-		cout << "\n" << "All 3 methods called";
+		// CREATE iterators for leftSSTable and rightSSTable
+		cout << "\nCreating Iterator for leftSSTable: ";
+		Iterator<uint64_t> leftIterator(leftSSTable);
+		cout << "\nCreating Iterator for rightSSTable: ";
+		Iterator<uint64_t> rightIterator(rightSSTable);
+
+		// Building learned indexes for leftSSTable
+		IndexBuilder<uint64_t> *leftIndexBuilder = new PgmIndexBuilder<uint64_t, 128>(0, new DuckDbKeyToFloatConverter());
+		cout << "\nBuilding indexes for leftSSTable";
+		leftIterator.seekToFirst();
+		while (!leftIterator.valid()) {
+			leftIndexBuilder->add(leftIterator.key());
+			leftIterator.next();
+		}
+		learned_index::Index<uint64_t> *leftIndex = leftIndexBuilder->build();
+		cout << "\nCompleted building indexes for leftSSTable successfully!";
+
+		// Building learned indexes for rightSSTable
+		IndexBuilder<uint64_t> *rightIndexBuilder = new PgmIndexBuilder<uint64_t, 128>(0, new DuckDbKeyToFloatConverter());
+		cout << "\nBuilding indexes for rightSSTable";
+		rightIterator.seekToFirst();
+		while (!rightIterator.valid()) {
+			rightIndexBuilder->add(rightIterator.key());
+			rightIterator.next();
+		}
+		learned_index::Index<uint64_t> *rightIndex = rightIndexBuilder->build();
+		cout << "\nCompleted building indexes for rightSSTable successfully!";
+
+		// CALLING HashJoin
+		cout << "\nCalling HashJoin";
+		Comparator<uint64_t> *comparator = new KVUint64Cmp();
+		SSTableBuilder<uint64_t> *result_builder;
+		int custom_num_threads = 1;
+		TableOp<uint64_t> *hash_join = new  HashJoin(&leftSSTable, &rightSSTable, leftIndexBuilder, comparator, result_builder, custom_num_threads);
+		cout << "\nCalling HashJoin profileOp()";
+		TableOpResult<uint64_t> result = hash_join->profileOp();
+		// result.stats["checksum"] = md5_checksum(result.output_table);
+		// return result.stats;
+
+  		////////////////////////////////////////////////////////////////////////////////////
+
+		cout << "\nSize of leftIterator: " << leftIterator.getSize();
+		leftIterator.seekToFirst();
+		while (leftIterator.valid()) {
+			uint64_t value = leftIterator.key();
+			cout << "\nValue: " << value;
+			leftIterator.next();
+		}
+
+		cout << "\nSize of rightIterator: " << rightIterator.getSize();
+		rightIterator.seekToFirst();
+		while (rightIterator.valid()) {
+			uint64_t value = rightIterator.key();
+			cout << "\nValue: " << value;
+			rightIterator.next();
+		}
+		cout << "\nlast key: " << rightIterator.key();
+		rightIterator.seekToFirst();
+		cout << "\nlast key: " << rightIterator.key();
+		// rightIterator.peek(1);
+		cout << "\nlast key: " << rightIterator.peek(20);
+		rightIterator.next();
+		cout << "\nlast key: " << rightIterator.key();
 		/*
-			Comments end.
+			End of Modified Code.
 		*/
 
 		plan = make_uniq<PhysicalHashJoin>(op, std::move(left), std::move(right), std::move(op.conditions),

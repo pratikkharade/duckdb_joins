@@ -29,16 +29,23 @@ namespace learned_index {
             virtual std::vector<Partition> getPartitions() = 0;
             virtual void doOpOnPartition(Partition partition, TableOpResult<T> *result) = 0;
             virtual void mergePartitions() = 0;
-            TableOp(SSTable<T> *outer, SSTable<T> *inner, PSSTableBuilder<T> *result_builder, int num_threads) : 
-                inner_(inner), outer_(outer), result_builder_(result_builder), num_threads_(num_threads), partition_results_(std::vector<TableOpResult<T>>(num_threads)) {}
+            TableOp(
+                SSTable<T> *outer,
+                SSTable<T> *inner,
+                SSTableBuilder<uint64_t> *result_builder,
+                int num_threads) : 
+                inner_(inner), outer_(outer),
+                num_threads_(num_threads),
+                partition_results_(std::vector<TableOpResult<T>>(num_threads)) {}
 
             TableOpResult<T> profileOp() {
                 preOp();
                 std::vector<Partition> partitions = getPartitions();
                 std::vector<std::thread> threads;
                 auto op_start = std::chrono::high_resolution_clock::now();
+
                 for (int i = 0; i < num_threads_; i++) {
-                    //threads.push_back(std::thread(&TableOp::doOpOnPartition, this, partitions[i], &partition_results_[i]));
+                    threads.push_back(std::thread(&TableOp::doOpOnPartition, this, partitions[i], &partition_results_[i]));
                     doOpOnPartition(partitions[i], &partition_results_[i]);
                 }
                 for (int i = 0; i < num_threads_; i++) {
@@ -56,7 +63,7 @@ namespace learned_index {
             SSTable<T> *outer_;
             SSTable<T> *inner_;
             SSTable<T> *output_table_;
-            PSSTableBuilder<T> *result_builder_;
+            SSTableBuilder<T> *result_builder_;
             std::vector<TableOpResult<T>> partition_results_;
             int num_threads_;
             json stats_;
